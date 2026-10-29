@@ -14,13 +14,23 @@
 
   const $ = (id) => document.getElementById(id);
   const estado = { datos: null, vista: 'tablero', expo: 0 };
-  const { normal, fechaMilitar, diasEntre, semaforo } = LeerPpt;
+  const { normal, fechaMilitar, diasEntre } = LeerPpt;
+  const { semaforo, diasAbierta } = Plazos;
   const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const hoy = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const vacio = (t) => !String(t || '').trim() || /^-\.?-$/.test(String(t).trim());
   const deExcel = () => estado.datos && estado.datos.fuente === 'excel';
   const numero = (f) => (deExcel() ? 'N.° ' : 'Lámina ') + f.lamina;
-  const avisos = (f, h) => [...LeerPpt.revisar(f, h), ...Plazos.revisar(f, h)];
+  const avisos = (f, h) => [...LeerPpt.revisar(Plazos.conVenceEfectivo(f), h), ...Plazos.revisar(f, h)];
+  const INICIO = () => fechaMilitar(Plazos.REGLAS.inicioControl);
+  // «1 año y 3 meses», «4 meses», «12 días»
+  function duracion(dias) {
+    if (dias == null) return '—';
+    if (dias < 60) return plural(dias, 'día');
+    const meses = Math.floor(dias / 30.44), anios = Math.floor(meses / 12), resto = meses % 12;
+    if (!anios) return plural(meses, 'mes', 'meses');
+    return plural(anios, 'año') + (resto ? ' y ' + plural(resto, 'mes', 'meses') : '');
+  }
   // Tareas que exigen algo (las «programadas» son solo recordatorio)
   const atrasos = (f, h) => Plazos.tareas(f, h).filter((t) => t.estado === 'atrasado' && t.regla !== 'programada');
   const plural = (n, s, p) => n + ' ' + (n === 1 ? s : p || s + 's');
@@ -104,7 +114,7 @@
     estado.vista = v;
     document.querySelectorAll('.pestanas button').forEach((b) => b.classList.toggle('activa', b.dataset.vista === v));
     document.querySelectorAll('.vista').forEach((s) => { s.hidden = s.id !== 'vista-' + v; });
-    ({ tablero: verTablero, agenda: verAgenda, buscar: verLista, fiscales: verFiscales, judiciales: verJudiciales, revisar: verRevisar }[v] || (() => {}))();
+    ({ tablero: verTablero, agenda: verAgenda, estadistica: verEstadistica, buscar: verLista, fiscales: verFiscales, judiciales: verJudiciales, revisar: verRevisar }[v] || (() => {}))();
     window.scrollTo(0, 0);
   }
 
@@ -123,8 +133,8 @@
     if (s === 'cerrada') derecha = '<b>Cerrada</b>';
     else if (!f.vence) derecha = '<b>Sin fecha</b><small>de vencimiento</small>';
     else {
-      const d = diasEntre(h, f.vence);
-      const txt = d < 0 ? `<span class="txt-rojo">venció hace ${d === -1 ? '1 día' : -d + ' d'}</span>` : d === 0 ? '<span class="txt-amarillo">vence hoy</span>' : d <= 7 ? `<span class="txt-amarillo">vence en ${d} d</span>` : `vence en ${d} d`;
+      const d = diasEntre(h, Plazos.venceEfectivo(f));
+      const txt = (Plazos.venceEfectivo(f) !== f.vence ? `<span class="ayuda">venció antes del ${INICIO()}</span><br>` : '') + (d < 0 ? `<span class="txt-rojo">venció hace ${d === -1 ? '1 día' : -d + ' d'}</span>` : d === 0 ? '<span class="txt-amarillo">vence hoy</span>' : d <= 7 ? `<span class="txt-amarillo">vence en ${d} d</span>` : `vence en ${d} d`);
       derecha = `<b>${SEMAFORO[s].punto} ${fechaMilitar(f.vence)}</b><small>${txt}</small>`;
     }
     const atr = atrasos(f, h).filter((t) => t.regla !== 'prórroga');
@@ -132,7 +142,7 @@
     return `<button class="item ${s}" data-id="${f.id}">
       <span class="nombre">${marcar(f.titulo)}</span>
       <span class="derecha">${derecha}${f.prorrogas != null ? `<small>${plural(f.prorrogas, 'prórroga')}</small>` : ''}</span>
-      <span class="linea">${marcar(f.unidad)} · <span class="etiqueta">${esc(f.tipoGrupo)}</span> <span class="etiqueta">${esc(f.estadoGrupo)}</span> · Fiscal: ${marcar(f.fiscal || '—')}</span>
+      <span class="linea">${marcar(f.unidad)} · <span class="etiqueta">${esc(f.tipoGrupo)}</span> <span class="etiqueta">${esc(f.estadoGrupo)}</span> · Fiscal: ${marcar(f.fiscal || '—')}${diasAbierta(f, h) != null ? ` · ⏳ abierta hace ${duracion(diasAbierta(f, h))}` : ''}</span>
       ${atr.length ? `<span class="proxima txt-rojo">⏱ ${esc(atr[0].que)} (${cuando(atr[0].dias)})</span>` : prox ? `<span class="proxima">➡️ ${marcar(prox.resto || prox.texto)}${f.proximas.length > 1 ? ` <small class="ayuda">(+${f.proximas.length - 1})</small>` : ''}</span>` : ''}
     </button>`;
   }
@@ -283,6 +293,51 @@
       </div>`).join('') : '<p class="panel">✅ No hay nada que revisar. ¡Bien!</p>';
   }
 
+  // ---------- Estadística (solo las ISA abiertas) ----------
+  function estadisticaHtml() {
+    const h = hoy(), abiertas = estado.datos.fichas.filter((f) => f.estadoGrupo !== 'Cerrada');
+    const conDias = abiertas.filter((f) => diasAbierta(f, h) != null);
+    const prom = (lista, fn) => { const v = lista.map(fn).filter((x) => x != null); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
+    const promDias = prom(conDias, (f) => diasAbierta(f, h));
+    const masAntigua = conDias.slice().sort((a, b) => diasAbierta(b, h) - diasAbierta(a, h));
+    const tramos = [['Menos de 3 meses', 0, 91], ['3 a 6 meses', 91, 183], ['6 meses a 1 año', 183, 366], ['Más de 1 año', 366, 1e9]]
+      .map(([t, a, b]) => [t, conDias.filter((f) => diasAbierta(f, h) >= a && diasAbierta(f, h) < b).length]);
+    const max = Math.max(1, ...tramos.map((x) => x[1]));
+    const tabla = (titulo, clave) => {
+      const g = {};
+      for (const f of abiertas) { const k = clave(f) || '—'; (g[k] = g[k] || []).push(f); }
+      const filas = Object.entries(g).sort((a, b) => b[1].length - a[1].length || (prom(b[1], (f) => diasAbierta(f, h)) || 0) - (prom(a[1], (f) => diasAbierta(f, h)) || 0));
+      return `<div class="panel"><h3>${titulo}</h3><div class="tabla-scroll"><table><thead><tr><th></th><th>ISA abiertas</th><th>Abierta (promedio)</th><th>Prórrogas (promedio)</th><th>Vencidas</th><th>Con plazos atrasados</th></tr></thead><tbody>${filas.map(([k, l]) => {
+        const v = l.filter((f) => semaforo(f, h) === 'vencida').length, a = l.filter((f) => atrasos(f, h).length).length;
+        return `<tr><td><b>${esc(k)}</b></td><td>${l.length}</td><td>${duracion(prom(l, (f) => diasAbierta(f, h)))}</td><td>${prom(l, (f) => f.prorrogas) ?? '—'}</td><td>${v ? `<span class="txt-rojo">${v}</span>` : 0}</td><td>${a ? `<span class="txt-rojo">${a}</span>` : 0}</td></tr>`;
+      }).join('')}</tbody></table></div></div>`;
+    };
+    return `
+      <div class="resumen">
+        <div class="cifra"><b>${abiertas.length}</b><span>ISA abiertas</span></div>
+        <div class="cifra"><b>${promDias != null ? duracion(promDias) : '—'}</b><span>tiempo abierta en promedio</span></div>
+        <div class="cifra"><b>${masAntigua.length ? duracion(diasAbierta(masAntigua[0], h)) : '—'}</b><span>la más antigua</span></div>
+        <div class="cifra"><b>${prom(abiertas, (f) => f.prorrogas) ?? '—'}</b><span>prórrogas en promedio</span></div>
+      </div>
+      <div class="dos-columnas">
+        <div class="panel"><h3>⏳ Cuánto tiempo llevan abiertas</h3>
+          ${tramos.map(([t, n]) => `<div class="barra-dato"><span>${t}</span><div class="fondo-barra"><div class="relleno" style="width:${(100 * n) / max}%"></div></div><span class="num">${n}</span></div>`).join('')}
+        </div>
+        <div class="panel"><h3>🐢 Las que llevan más tiempo abiertas</h3>
+          <div class="lista compacta">${masAntigua.slice(0, 5).map((f) => `<button class="item ${semaforo(f, h)}" data-id="${f.id}"><span class="nombre">${esc(f.titulo)}</span><span class="derecha"><b>${duracion(diasAbierta(f, h))}</b><small>desde ${fechaMilitar(f.inicio)}</small></span><span class="linea">${esc(f.tipoGrupo)} · ${plural(f.prorrogas || 0, 'prórroga')} · ${esc(f.fiscal)}</span></button>`).join('')}</div>
+        </div>
+      </div>
+      ${tabla('📂 Por tipo de ISA', (f) => f.tipoGrupo)}
+      ${tabla('🏥 Por etapa en la CSE', (f) => Plazos.etapaCse(f, h).etapa || 'Sin trámite en la CSE')}
+      ${tabla('👤 Por fiscal', (f) => f.fiscal)}
+      ${tabla('🏢 Por unidad', (f) => f.unidad)}`;
+  }
+  function verEstadistica() { $('estadistica').innerHTML = estadisticaHtml(); }
+  function imprimirEstadistica() {
+    $('impresion').innerHTML = `<h1>Investigaciones sumarias ESCINF — estadística al ${fechaMilitar(hoy())}</h1><p>${esc(estado.datos.archivo)} · solo ISA abiertas</p>` + estadisticaHtml();
+    window.print();
+  }
+
   // ---------- Ficha ----------
   function contenidoFicha(f, enExpo) {
     const h = hoy(), s = semaforo(f, h);
@@ -294,8 +349,8 @@
     }).join('')}</ul>` : '<p class="ayuda">— (no hay)</p>';
     let venceTxt = '—';
     if (f.vence) {
-      const d = diasEntre(h, f.vence);
-      venceTxt = fechaMilitar(f.vence) + (s === 'cerrada' ? '' : d < 0 ? ` (venció hace ${plural(-d, 'día')})` : d === 0 ? ' (hoy)' : ` (en ${plural(d, 'día')})`);
+      const d = diasEntre(h, Plazos.venceEfectivo(f));
+      venceTxt = fechaMilitar(f.vence) + (s === 'cerrada' ? '' : Plazos.venceEfectivo(f) !== f.vence ? ` (venció antes del ${INICIO()}; se cuenta desde ese día${d < 0 ? ': atrasado ' + plural(-d, 'día') : ''})` : d < 0 ? ` (venció hace ${plural(-d, 'día')})` : d === 0 ? ' (hoy)' : ` (en ${plural(d, 'día')})`);
     }
     const cse = Plazos.etapaCse(f, h).etapa;
     const tareas = Plazos.tareas(f, h);
@@ -309,7 +364,7 @@
         ${dato('Unidad', f.unidad)}${dato('Tipo de ISA', f.tipo)}${dato('Estado', f.estado)}
         ${dato('Fecha de inicio', f.inicio ? fechaMilitar(f.inicio) + (f.inicioSinAnio ? ' (sin año)' : '') : f.inicioTexto)}
         ${dato('Fiscal', f.fiscal)}${dato('Secretario', f.secretario)}
-        ${dato('Prórrogas', f.prorrogas)}${dato('Vence la prórroga', venceTxt)}
+        ${dato('Prórrogas', f.prorrogas)}${dato('Vence la prórroga', venceTxt)}${dato('Lleva abierta', diasAbierta(f, h) != null ? duracion(diasAbierta(f, h)) + ' (' + plural(diasAbierta(f, h), 'día') + ')' : '')}
       </div>
       <div class="casillas">${casilla('CS DIVEDUC', f.csDiveduc)}${casilla('CSE', f.cse)}${casilla('Dictamen', f.dictamen)}</div>
       ${tareas.length ? `<div class="plazos-ficha"><h3>📅 Plazos</h3>${tareas.map((t) => `<div class="tarea-linea ${t.estado}">${PLAZO[t.estado]} <b>${fechaMilitar(t.limite)}</b> <small>(${cuando(t.dias)})</small> — ${esc(t.que)} <small class="ayuda">· ${esc(t.regla)}</small></div>`).join('')}</div>` : ''}
@@ -338,8 +393,8 @@
     $('impresion').innerHTML = `
       <h1>Investigaciones sumarias ESCINF — resumen al ${fechaMilitar(h)}</h1>
       <p>${esc(d.archivo)} · ${d.fichas.length} ISA · ${por('vencida')} vencidas · ${por('por_vencer')} vencen en 7 días · ${por('al_dia')} al día · ${por('cerrada')} cerradas</p>
-      <table><thead><tr><th></th><th>Afectado / ISA</th><th>Unidad</th><th>Tipo</th><th>Estado</th><th>Fiscal</th><th>Prór.</th><th>Vence</th><th>Última diligencia</th><th>Próxima diligencia</th><th>Plazos atrasados</th></tr></thead>
-      <tbody>${orden.map((f) => { const s = semaforo(f, h), u = ultimaDe(f); return `<tr><td>${SEMAFORO[s].punto}</td><td>${esc(f.titulo)}</td><td>${esc(f.unidad)}</td><td>${esc(f.tipoGrupo)}</td><td>${esc(f.estadoGrupo)}</td><td>${esc(f.fiscal)}</td><td>${f.prorrogas ?? ''}</td><td>${f.vence ? fechaMilitar(f.vence) : ''}</td><td>${u ? (u.fecha ? fechaMilitar(u.fecha) + ' ' : '') + esc(u.resto || u.texto) : ''}</td><td>${esc(f.proximas.map((p) => p.texto).join('\n'))}</td><td>${esc(atrasos(f, h).map((t) => t.que).join('\n'))}</td></tr>`; }).join('')}</tbody></table>`;
+      <table><thead><tr><th></th><th>Afectado / ISA</th><th>Unidad</th><th>Tipo</th><th>Estado</th><th>Fiscal</th><th>Prór.</th><th>Vence</th><th>Abierta</th><th>Última diligencia</th><th>Próxima diligencia</th><th>Plazos atrasados</th></tr></thead>
+      <tbody>${orden.map((f) => { const s = semaforo(f, h), u = ultimaDe(f); return `<tr><td>${SEMAFORO[s].punto}</td><td>${esc(f.titulo)}</td><td>${esc(f.unidad)}</td><td>${esc(f.tipoGrupo)}</td><td>${esc(f.estadoGrupo)}</td><td>${esc(f.fiscal)}</td><td>${f.prorrogas ?? ''}</td><td>${f.vence ? fechaMilitar(f.vence) : ''}</td><td>${diasAbierta(f, h) != null ? plural(diasAbierta(f, h), 'día') : ''}</td><td>${u ? (u.fecha ? fechaMilitar(u.fecha) + ' ' : '') + esc(u.resto || u.texto) : ''}</td><td>${esc(f.proximas.map((p) => p.texto).join('\n'))}</td><td>${esc(atrasos(f, h).map((t) => t.que).join('\n'))}</td></tr>`; }).join('')}</tbody></table>`;
     window.print();
   }
   function imprimirAgenda() {
@@ -353,8 +408,8 @@
         <table><thead><tr><th>✔</th><th>Plazo</th><th>ISA</th><th>Qué hacer</th><th>Regla</th></tr></thead>
         <tbody>${g.tareas.map((t) => `<tr><td>☐</td><td>${PLAZO[t.estado]} ${fechaMilitar(t.limite)}<br>${cuando(t.dias)}</td><td>${esc(t.f.titulo)}</td><td>${esc(t.que)}</td><td>${esc(t.regla)}</td></tr>`).join('')}</tbody></table>
         <h2>Sus ISA</h2>
-        <table><thead><tr><th></th><th>Afectado / ISA</th><th>Estado</th><th>Prórrogas</th><th>Vence</th><th>CSE</th></tr></thead>
-        <tbody>${g.fichas.slice().sort(ordenVence).map((f) => { const s = semaforo(f, h); return `<tr><td>${SEMAFORO[s].punto}</td><td>${esc(f.titulo)}</td><td>${esc(f.estadoGrupo)}</td><td>${f.prorrogas ?? ''}</td><td>${f.vence ? fechaMilitar(f.vence) : ''}</td><td>${esc(Plazos.etapaCse(f, h).etapa)}</td></tr>`; }).join('')}</tbody></table>
+        <table><thead><tr><th></th><th>Afectado / ISA</th><th>Estado</th><th>Prórrogas</th><th>Vence</th><th>Abierta</th><th>CSE</th></tr></thead>
+        <tbody>${g.fichas.slice().sort(ordenVence).map((f) => { const s = semaforo(f, h); return `<tr><td>${SEMAFORO[s].punto}</td><td>${esc(f.titulo)}</td><td>${esc(f.estadoGrupo)}</td><td>${f.prorrogas ?? ''}</td><td>${f.vence ? fechaMilitar(f.vence) : ''}</td><td>${diasAbierta(f, h) != null ? plural(diasAbierta(f, h), 'día') : ''}</td><td>${esc(Plazos.etapaCse(f, h).etapa)}</td></tr>`; }).join('')}</tbody></table>
       </div>`).join('');
     window.print();
   }
@@ -380,6 +435,7 @@
     const lams = [`<div class="portada"><h1>INVESTIGACIONES SUMARIAS</h1><p class="fecha-portada">${fechaMilitar(h)}</p>
       <div class="resumen">${[[d.fichas.length, 'ISA'], [d.fichas.filter((f) => f.estadoGrupo !== 'Cerrada').length, 'abiertas'], [por('vencida'), 'vencidas'], [por('por_vencer'), 'vencen en 7 días'], [d.fichas.filter((f) => atrasos(f, h).length).length, 'con plazos atrasados']]
         .map(([n, t]) => `<div class="cifra"><b>${n}</b><span>${t}</span></div>`).join('')}</div></div>`];
+    lams.push('<h2>📈 Estadística de las ISA abiertas</h2>' + estadisticaHtml());
     for (const f of d.fichas.slice().sort((a, b) => a.lamina - b.lamina)) lams.push(contenidoFicha(f, true));
     for (const t of d.tablas) {
       lams.push(`<h2>${esc(t.titulo)}</h2><table><thead><tr>${t.titulos.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${t.filas.map((fila) => `<tr>${t.titulos.map((c, i) => `<td>${esc(fila[i])}</td>`).join('')}</tr>`).join('')}</tbody></table>`);
@@ -412,6 +468,7 @@
   $('archivo').addEventListener('change', (e) => { cargarArchivo(e.target.files[0]); e.target.value = ''; });
   $('imprimir').addEventListener('click', imprimirResumen);
   $('imprimirAgenda').addEventListener('click', imprimirAgenda);
+  $('imprimirEstadistica').addEventListener('click', imprimirEstadistica);
   $('pasarExcel').addEventListener('click', pasarExcel);
   $('exponer').addEventListener('click', exponer);
   $('expoSalir').addEventListener('click', salirExpo);

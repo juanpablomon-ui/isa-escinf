@@ -7,7 +7,9 @@
   const L = typeof module !== 'undefined' && module.exports ? require('./leer_ppt.js') : raiz.LeerPpt;
   const { normal, diasEntre, fechaMilitar } = L;
 
-  const REGLAS = { prorrogaMax: 20, cse: 30, gestion: 15, semana: 7 };
+  // inicioControl: los plazos se cuentan desde este día, no hacia atrás (lo anterior ya no se puede corregir)
+  const REGLAS = { prorrogaMax: 20, cse: 30, gestion: 15, semana: 7, inicioControl: '2026-10-29' };
+  const desdeControl = (iso) => (iso && iso > REGLAS.inicioControl ? iso : REGLAS.inicioControl);
   const TIPOS = ['Solicitud CSE', 'Reiteración CSE', 'Citación CSE', 'Asistencia CSE', 'Pide informe CSE', 'Informe CSE recibido', 'Prórroga', 'Otra gestión'];
   const PIDE_CSE = ['Solicitud CSE', 'Reiteración CSE'];
 
@@ -102,18 +104,19 @@
     const hechas = f.diligencias.filter((d) => d.hecha && d.fecha);
     // Si la próxima prórroga ya está anotada como pendiente, basta con esa
     if (f.vence && !f.proximas.some((p) => p.tipo === 'Prórroga' && p.fecha && p.fecha <= f.vence && p.fecha >= hoy)) {
-      lista.push({ que: `Pedir prórroga${f.prorrogas != null ? ' N.° ' + (f.prorrogas + 1) : ''} (antes de que venza)`, limite: f.vence, regla: 'prórroga', ...estadoPlazo(f.vence, hoy) });
+      const limite = desdeControl(f.vence);
+      lista.push({ que: `Pedir prórroga${f.prorrogas != null ? ' N.° ' + (f.prorrogas + 1) : ''} (${limite === f.vence ? 'antes de que venza' : 'venció antes del ' + fechaMilitar(REGLAS.inicioControl)})`, limite, regla: 'prórroga', ...estadoPlazo(limite, hoy) });
     }
     const cse = etapaCse(f, hoy);
     if (cse.etapa === 'Sin citar') {
-      const base = cse.desde || f.inicio;
+      const base = desdeControl(cse.desde || f.inicio);
       if (base) {
         const limite = sumarDias(base, REGLAS.cse);
         lista.push({ que: cse.noAsistio ? 'Pedir nueva hora a la CSE (la citación ya pasó)' : 'Reiterar la solicitud a la CSE', limite, regla: 'CSE cada 30 días', desde: base, ...estadoPlazo(limite, hoy) });
       }
     }
     const gestiones = hechas.filter((d) => !PIDE_CSE.includes(d.tipo) && d.tipo !== 'Citación CSE').map((d) => d.fecha).sort();
-    const base = gestiones.pop() || f.inicio;
+    const base = desdeControl(gestiones.pop() || f.inicio);
     if (base) {
       const limite = sumarDias(base, REGLAS.gestion);
       const sugerida = f.proximas.find((p) => !PIDE_CSE.includes(p.tipo));
@@ -150,7 +153,14 @@
     return avisos;
   }
 
-  const Plazos = { REGLAS, TIPOS, clasificar, fechaDiligencia, completar, etapaCse, tareas, revisar, sumarDias };
+  // Vencimiento para el semáforo: si venció antes del inicio del control, se cuenta desde ese día
+  const venceEfectivo = (f) => (f.vence ? desdeControl(f.vence) : '');
+  const conVenceEfectivo = (f) => ({ ...f, vence: venceEfectivo(f) });
+  const semaforo = (f, hoy) => L.semaforo(conVenceEfectivo(f), hoy);
+  // Días que lleva abierta (desde la fecha de inicio); en las cerradas no se sabe la fecha de cierre
+  const diasAbierta = (f, hoy) => (f.inicio && f.estadoGrupo !== 'Cerrada' ? Math.max(0, diasEntre(f.inicio, hoy)) : null);
+
+  const Plazos = { REGLAS, TIPOS, clasificar, fechaDiligencia, completar, etapaCse, tareas, revisar, sumarDias, venceEfectivo, conVenceEfectivo, semaforo, diasAbierta };
   if (typeof module !== 'undefined' && module.exports) module.exports = Plazos;
   else raiz.Plazos = Plazos;
 })(this);

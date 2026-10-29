@@ -37,6 +37,7 @@
   <nav class="pestanas" id="pestanas" hidden>
     <button data-vista="tablero" class="activa">📊 Tablero</button>
     <button data-vista="agenda">📅 Agenda <span id="nAtrasos" class="globo"></span></button>
+    <button data-vista="estadistica">📈 Estadística</button>
     <button data-vista="buscar">🔎 Buscar ISA</button>
     <button data-vista="fiscales">👤 Por fiscal</button>
     <button data-vista="judiciales" id="pestanaJudiciales">⚖️ Procesos judiciales</button>
@@ -101,8 +102,15 @@
         </select>
         <button class="boton" id="imprimirAgenda">🖨 Imprimir agenda por fiscal</button>
       </div>
-      <p class="ayuda">Reglas: la prórroga dura hasta 20 días · a la CSE, cada 30 días hasta que lo citen · las demás gestiones (incluidas prórroga y pedir el informe a la CSE), cada 15 días.</p>
+      <p class="ayuda">Los plazos se cuentan desde el 29OCT2026 (inicio del control); lo anterior no se cuenta como atraso. Reglas: la prórroga dura hasta 20 días · a la CSE, cada 30 días hasta que lo citen · las demás gestiones (incluidas prórroga y pedir el informe a la CSE), cada 15 días.</p>
       <div id="agenda"></div>
+    </section>
+
+    <!-- Estadística -->
+    <section id="vista-estadistica" class="vista" hidden>
+      <p class="ahora">👉 <b>Ahora:</b> vea cuánto tiempo llevan abiertas las ISA y dónde se acumulan (por tipo, etapa en la CSE, fiscal y unidad). Solo cuenta las abiertas.</p>
+      <div class="filtros"><button class="boton" id="imprimirEstadistica">🖨 Imprimir estadística</button></div>
+      <div id="estadistica"></div>
     </section>
 
     <!-- Buscar -->
@@ -125,7 +133,7 @@
           <option value="vence">Vence primero</option>
           <option value="lamina">Por N.°</option>
           <option value="prorrogas">Más prórrogas primero</option>
-          <option value="inicio">Más antiguas primero</option>
+          <option value="inicio">Más tiempo abierta primero</option>
           <option value="nombre">Por nombre (A-Z)</option>
         </select>
       </div>
@@ -161,6 +169,7 @@
           <li><b>Prórroga:</b> dura hasta 20 días. La app avisa si «Vence la prórroga» queda a más de 20 días de cuando se pidió, y recuerda pedir la siguiente antes de que venza.</li>
           <li><b>CSE:</b> mientras no lo citen, se pide o reitera cada 30 días. Si la citación ya pasó y no hay asistencia anotada, hay que pedir hora de nuevo.</li>
           <li><b>Las demás gestiones</b> (también pedir prórroga y pedir el informe a la CSE): cada 15 días desde la última.</li>
+          <li><b>Desde cuándo se cuenta:</b> desde el <b>29OCT2026</b>, día en que empezó el control con esta app. Lo que venció o se atrasó antes no se puede corregir: se cuenta desde ese día (por ejemplo, si la última gestión fue en junio, la próxima vence el 13NOV2026).</li>
         </ul>
         <h3>🚦 Los colores</h3>
         <ul>
@@ -178,6 +187,8 @@
           <dt>CSD</dt><dd>Comisión de Sanidad Divisionaria.</dd>
           <dt>Dictamen</dt><dd>Conclusión del fiscal al terminar la investigación.</dd>
         </dl>
+        <h3>📈 Estadística</h3>
+        <p>Usa solo las ISA abiertas. «Abierta» = días desde la fecha de inicio hasta hoy. Muestra el promedio, la más antigua, cuántas hay por tramo de tiempo, y tablas por tipo, etapa en la CSE, fiscal y unidad con el tiempo abierta promedio, las prórrogas promedio, las vencidas y las con plazos atrasados.</p>
         <h3>📽 Exponer</h3>
         <p>Muestra una ISA por pantalla, como láminas. Avance con las flechas ← → o la barra espaciadora; salga con Esc.</p>
         <p class="nota">La hoja «Instrucciones» del Excel explica cómo llenarlo y qué significa cada tipo de diligencia.</p>

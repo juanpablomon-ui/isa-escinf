@@ -1,5 +1,5 @@
 /* Guarda la app en el equipo para que funcione sin internet. Subir VERSION en cada cambio. */
-const VERSION = 'isa-1.0.0';
+const VERSION = 'isa-1.1.0';
 const ARCHIVOS = ['./', 'index.html', 'estilos.css', 'leer_ppt.js', 'plazos.js', 'excel.js', 'app.js', 'lib/xlsx.full.min.js', 'manifest.webmanifest',
   'iconos/icono.svg', 'iconos/icono-180.png', 'iconos/icono-192.png', 'iconos/icono-512.png'];
 self.addEventListener('install', e=>{ e.waitUntil(caches.open(VERSION).then(c=>c.addAll(ARCHIVOS))); self.skipWaiting(); });
