@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ISA ESCINF</title>
+  <meta name="theme-color" content="#24364f">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2324364f'/%3E%3Ctext x='32' y='44' font-size='34' text-anchor='middle' fill='%23c8a951' font-family='Arial' font-weight='bold'%3EISA%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <header class="barra">
+    <div class="marca">
+      <span class="escudo">📁</span>
+      <div>
+        <h1>ISA ESCINF</h1>
+        <p id="fuente">Consulta rápida de las investigaciones sumarias</p>
+      </div>
+    </div>
+    <div class="acciones">
+      <label class="boton principal">📂 Cargar PowerPoint
+        <input type="file" id="archivo" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
+      </label>
+      <button class="boton" id="imprimir" hidden>🖨 Imprimir resumen</button>
+      <button class="boton" id="olvidar" hidden title="Borra los datos guardados en este computador">🗑 Olvidar datos</button>
+    </div>
+  </header>
+
+  <nav class="pestanas" id="pestanas" hidden>
+    <button data-vista="tablero" class="activa">📊 Tablero</button>
+    <button data-vista="buscar">🔎 Buscar ISA</button>
+    <button data-vista="fiscales">👤 Por fiscal</button>
+    <button data-vista="judiciales" id="pestanaJudiciales">⚖️ Procesos judiciales</button>
+    <button data-vista="revisar">⚠️ Revisar planilla <span id="nRevisar" class="globo"></span></button>
+    <button data-vista="que-es">❔ ¿Qué es?</button>
+  </nav>
+
+  <main>
+    <!-- Sin datos todavía -->
+    <section id="bienvenida" class="bienvenida">
+      <div class="caja-carga" id="zonaCarga">
+        <div class="icono-grande">📁</div>
+        <h2>Cargue el PowerPoint de la exposición de ISA</h2>
+        <p class="ahora">👉 <b>Ahora:</b> arrastre aquí el archivo del S-1 (por ejemplo <b>EXPO ISAs ESCINF 28OCT2026.pptx</b>) o use el botón <b>📂 Cargar PowerPoint</b>.</p>
+        <p>La app lee cada lámina (una por ISA) y arma el tablero, el buscador y los avisos. Cada semana se carga la presentación nueva.</p>
+        <label class="recordar"><input type="checkbox" id="recordar"> Recordar los datos en este computador (para no cargarlo cada vez)</label>
+        <p class="nota">🔒 El archivo se lee en este computador. No se envía a ninguna parte. Tiene datos médicos y personales: si el computador es compartido, deje sin marcar «Recordar».</p>
+      </div>
+    </section>
+
+    <!-- Tablero -->
+    <section id="vista-tablero" class="vista" hidden>
+      <p class="ahora">👉 <b>Ahora:</b> mire primero las <b>vencidas</b> y las que <b>vencen esta semana</b>. Toque una ISA para ver su ficha.</p>
+      <div class="resumen" id="cifras"></div>
+      <div class="dos-columnas">
+        <div class="panel">
+          <h3>⏰ Vencimientos</h3>
+          <p class="ayuda" id="hoyTexto"></p>
+          <div id="listaVencimientos" class="lista compacta"></div>
+        </div>
+        <div>
+          <div class="panel">
+            <h3>📂 Por tipo</h3>
+            <div id="barrasTipo"></div>
+          </div>
+          <div class="panel">
+            <h3>📌 Por estado</h3>
+            <div id="barrasEstado"></div>
+          </div>
+          <div class="panel">
+            <h3>🔁 Más prórrogas</h3>
+            <div id="listaProrrogas" class="lista compacta"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Buscar -->
+    <section id="vista-buscar" class="vista" hidden>
+      <div class="filtros">
+        <input type="search" id="busqueda" placeholder="Escriba un nombre, unidad, fiscal o palabra: Montoya, Corona, BRIMOT, fractura…" autocomplete="off">
+        <select id="filtroEstado"><option value="">Estado: todos</option></select>
+        <select id="filtroTipo"><option value="">Tipo: todos</option></select>
+        <select id="filtroFiscal"><option value="">Fiscal: todos</option></select>
+        <select id="filtroSemaforo">
+          <option value="">Vencimiento: todos</option>
+          <option value="abiertas">📂 Abiertas o en trámite</option>
+          <option value="vencida">🔴 Vencidas</option>
+          <option value="por_vencer">🟡 Vencen en 7 días</option>
+          <option value="al_dia">🟢 Al día</option>
+          <option value="cerrada">⚪ Cerradas</option>
+        </select>
+        <select id="orden">
+          <option value="vence">Vence primero</option>
+          <option value="lamina">Orden de la presentación</option>
+          <option value="prorrogas">Más prórrogas primero</option>
+          <option value="inicio">Más antiguas primero</option>
+          <option value="nombre">Por nombre (A-Z)</option>
+        </select>
+      </div>
+      <p class="contador" id="contador"></p>
+      <div id="lista" class="lista"></div>
+    </section>
+
+    <!-- Por fiscal -->
+    <section id="vista-fiscales" class="vista" hidden>
+      <p class="ahora">👉 <b>Ahora:</b> toque un fiscal para ver sus ISA.</p>
+      <div id="tarjetasFiscales" class="rejilla"></div>
+    </section>
+
+    <!-- Procesos judiciales -->
+    <section id="vista-judiciales" class="vista" hidden>
+      <div class="filtros"><input type="search" id="busquedaJudicial" placeholder="Buscar en los procesos judiciales…" autocomplete="off"></div>
+      <div id="tablasJudiciales"></div>
+    </section>
+
+    <!-- Revisar -->
+    <section id="vista-revisar" class="vista" hidden>
+      <p class="ahora">👉 <b>Ahora:</b> corrija esto en el PowerPoint antes de la exposición y vuelva a cargarlo.</p>
+      <div id="listaRevisar"></div>
+    </section>
+
+    <!-- ¿Qué es? -->
+    <section id="vista-que-es" class="vista" hidden>
+      <div class="panel texto">
+        <h3>❔ ¿Qué muestra esta app?</h3>
+        <p>Lee el PowerPoint de la exposición de investigaciones sumarias (una lámina por ISA) y las ordena para consultarlas rápido. No cambia el PowerPoint: si algo está mal, se corrige en el PowerPoint y se vuelve a cargar.</p>
+        <h3>🚦 Los colores</h3>
+        <ul>
+          <li>🔴 <b>Vencida:</b> la fecha de vencimiento («Fecha Ven») ya pasó.</li>
+          <li>🟡 <b>Vence en 7 días</b> o menos.</li>
+          <li>🟢 <b>Al día:</b> vence en más de 7 días.</li>
+          <li>⚪ <b>Cerrada.</b></li>
+        </ul>
+        <h3>📖 Palabras</h3>
+        <dl class="glosario">
+          <dt>ISA</dt><dd>Investigación sumaria administrativa.</dd>
+          <dt>Fiscal y secretario</dt><dd>Quienes llevan la investigación.</dd>
+          <dt>Prórroga</dt><dd>Más plazo para la investigación. La lámina dice cuántas lleva y hasta cuándo vence la actual.</dd>
+          <dt>CSE</dt><dd>Comisión de Sanidad del Ejército.</dd>
+          <dt>CSD</dt><dd>Comisión de Sanidad Divisionaria.</dd>
+          <dt>Dictamen</dt><dd>Conclusión del fiscal al terminar la investigación.</dd>
+        </dl>
+        <h3>⚠️ «Revisar planilla»</h3>
+        <p>Avisa de lo que conviene corregir: ISA vencidas, próximas diligencias con fecha ya pasada, ISA abiertas sin próximas diligencias y fechas escritas de otra forma (lo normal es DDMMMAAAA, por ejemplo 14DIC2024).</p>
+        <p class="nota">Para que la app lea bien una lámina nueva, cópiela de una existente y cambie solo el texto de las casillas.</p>
+      </div>
+    </section>
+
+    <!-- Para imprimir -->
+    <section id="impresion" class="impresion"></section>
+  </main>
+
+  <!-- Ficha de una ISA -->
+  <dialog id="ficha">
+    <div id="fichaContenido"></div>
+    <form method="dialog"><button class="boton principal">Cerrar</button></form>
+  </dialog>
+
+  <script src="leer_ppt.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
