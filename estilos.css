@@ -281,6 +281,18 @@ dialog form { text-align: right; margin-top: 12px; }
 
 .impresion { display: none; }
 
+/* Ficha armada para enviar como foto: fuera de la pantalla y siempre en colores claros */
+.pie-ficha { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.foto-ficha {
+  position: fixed; left: -10000px; top: 0; width: 760px; padding: 24px;
+  --fondo: #f2f4f7; --papel: #ffffff; --texto: #1b2433; --suave: #5b6678; --linea: #d8dde5;
+  --azul-claro: #e4eaf3; --acento: #2f5d8f; --rojo-claro: #fbe9e7; --amarillo-claro: #fff6d6;
+  background: #ffffff; color: #1b2433;
+}
+.foto-encabezado { background: #24364f; color: #fff; font-weight: 700; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; }
+.foto-ficha .txt-amarillo { color: #a57d00; }
+.foto-ficha .txt-rojo { color: #b3261e; }
+
 @media (max-width: 760px) {
   .dos-columnas { grid-template-columns: 1fr; }
 }

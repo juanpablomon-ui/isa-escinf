@@ -202,7 +202,7 @@
   <!-- Ficha de una ISA -->
   <dialog id="ficha">
     <div id="fichaContenido"></div>
-    <form method="dialog"><button class="boton principal">Cerrar</button></form>
+    <form method="dialog" class="pie-ficha"><button class="boton" id="enviarFoto" type="button">📷 Enviar como foto</button><button class="boton principal">Cerrar</button></form>
   </dialog>
 
   <!-- Modo exposición -->
@@ -217,6 +217,7 @@
   </div>
 
   <script src="lib/xlsx.full.min.js"></script>
+  <script src="lib/html2canvas-1.4.1.js"></script>
   <script src="leer_ppt.js"></script>
   <script src="plazos.js"></script>
   <script src="excel.js"></script>

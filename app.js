@@ -339,7 +339,9 @@
   }
 
   // ---------- Ficha ----------
-  function contenidoFicha(f, enExpo) {
+  // modo: 'ficha' (pantalla), 'expo' (lámina: últimas 4 diligencias) o 'foto' (para enviar: sin avisos)
+  function contenidoFicha(f, modo) {
+    const enExpo = modo === 'expo';
     const h = hoy(), s = semaforo(f, h);
     const dato = (t, v) => `<div class="dato"><small>${t}</small><b>${esc(vacio(v) ? '—' : v)}</b></div>`;
     const casilla = (t, v) => `<span class="casilla">${t}:<b>${esc(vacio(v) ? '—' : v)}</b></span>`;
@@ -374,14 +376,55 @@
         <h3>➡️ Próximas diligencias</h3>${tiempo(f.proximas, 'proximas')}
         ${f.notas ? `<h3>🗒 Notas</h3><p>${esc(f.notas)}</p>` : ''}
       </div>
-      ${!enExpo && av.length ? `<div class="avisos-ficha"><b>⚠️ Para revisar</b><ul>${av.map((a) => `<li>${esc(a.texto)}</li>`).join('')}</ul></div>` : ''}`;
+      ${modo === 'ficha' && av.length ? `<div class="avisos-ficha"><b>⚠️ Para revisar</b><ul>${av.map((a) => `<li>${esc(a.texto)}</li>`).join('')}</ul></div>` : ''}`;
   }
   function abrirFicha(id) {
     const f = estado.datos.fichas.find((x) => x.id === id);
     if (!f) return;
-    $('fichaContenido').innerHTML = contenidoFicha(f, false);
+    $('fichaContenido').innerHTML = contenidoFicha(f, 'ficha');
     $('ficha').showModal();
     $('ficha').scrollTop = 0;
+    prepararFoto(f);
+  }
+
+  // ---------- Enviar la ficha como foto (WhatsApp, correo…) ----------
+  // La imagen se arma apenas se abre la ficha: así, al tocar el botón, el teléfono deja compartirla de inmediato.
+  const foto = { id: null, archivo: null, listo: null };
+  function prepararFoto(f) {
+    const boton = $('enviarFoto');
+    foto.id = f.id; foto.archivo = null;
+    boton.disabled = true; boton.textContent = '📷 Preparando foto…';
+    if (typeof html2canvas === 'undefined') { boton.hidden = true; return; }
+    const caja = document.createElement('div');
+    caja.className = 'foto-ficha';
+    caja.innerHTML = `<div class="foto-encabezado">📁 ISA ESCINF · al ${fechaMilitar(hoy())}</div>` + contenidoFicha(f, 'foto');
+    document.body.appendChild(caja);
+    const id = f.id;
+    foto.listo = html2canvas(caja, { scale: 2, backgroundColor: '#ffffff', logging: false })
+      .then((lienzo) => new Promise((ok) => lienzo.toBlob(ok, 'image/png')))
+      .then((blob) => {
+        if (foto.id !== id) return;
+        const nombre = 'ISA ' + f.titulo.replace(/[\\/:*?"<>|.]+/g, ' ').replace(/\s+/g, ' ').trim() + '.png';
+        foto.archivo = new File([blob], nombre, { type: 'image/png' });
+        boton.disabled = false; boton.textContent = '📷 Enviar como foto';
+      })
+      .catch(() => { boton.textContent = '📷 No se pudo armar la foto'; })
+      .finally(() => caja.remove());
+  }
+  async function enviarFoto() {
+    const a = foto.archivo;
+    if (!a) return;
+    // Teléfono (y Safari del Mac): menú «Compartir» → WhatsApp
+    if (navigator.canShare && navigator.canShare({ files: [a] })) {
+      try { await navigator.share({ files: [a], title: a.name }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    // Si no se puede compartir: copiar (para pegar en WhatsApp con ⌘V) y descargar
+    let copiada = false;
+    try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': a })]); copiada = true; } catch (e) { /* sin permiso */ }
+    const url = URL.createObjectURL(a), enlace = document.createElement('a');
+    enlace.href = url; enlace.download = a.name; document.body.appendChild(enlace); enlace.click(); enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    alert((copiada ? 'La foto quedó copiada: en WhatsApp pégela con ⌘V (o Ctrl+V).\n\n' : '') + `También se guardó «${a.name}» en Descargas, para adjuntarla.`);
   }
 
   // ---------- Imprimir ----------
@@ -436,7 +479,7 @@
       <div class="resumen">${[[d.fichas.length, 'ISA'], [d.fichas.filter((f) => f.estadoGrupo !== 'Cerrada').length, 'abiertas'], [por('vencida'), 'vencidas'], [por('por_vencer'), 'vencen en 7 días'], [d.fichas.filter((f) => atrasos(f, h).length).length, 'con plazos atrasados']]
         .map(([n, t]) => `<div class="cifra"><b>${n}</b><span>${t}</span></div>`).join('')}</div></div>`];
     lams.push('<h2>📈 Estadística de las ISA abiertas</h2>' + estadisticaHtml());
-    for (const f of d.fichas.slice().sort((a, b) => a.lamina - b.lamina)) lams.push(contenidoFicha(f, true));
+    for (const f of d.fichas.slice().sort((a, b) => a.lamina - b.lamina)) lams.push(contenidoFicha(f, 'expo'));
     for (const t of d.tablas) {
       lams.push(`<h2>${esc(t.titulo)}</h2><table><thead><tr>${t.titulos.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${t.filas.map((fila) => `<tr>${t.titulos.map((c, i) => `<td>${esc(fila[i])}</td>`).join('')}</tr>`).join('')}</tbody></table>`);
     }
@@ -469,6 +512,7 @@
   $('imprimir').addEventListener('click', imprimirResumen);
   $('imprimirAgenda').addEventListener('click', imprimirAgenda);
   $('imprimirEstadistica').addEventListener('click', imprimirEstadistica);
+  $('enviarFoto').addEventListener('click', (e) => { e.preventDefault(); enviarFoto(); });
   $('pasarExcel').addEventListener('click', pasarExcel);
   $('exponer').addEventListener('click', exponer);
   $('expoSalir').addEventListener('click', salirExpo);
