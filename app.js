@@ -339,6 +339,20 @@
   }
 
   // ---------- Ficha ----------
+  // Las próximas diligencias, en un recuadro destacado al comienzo de la ficha
+  function proximasDestacadas(f, h) {
+    if (f.estadoGrupo === 'Cerrada' && !f.proximas.length) return '';
+    const filas = f.proximas.map((p) => {
+      let cuandoTxt = '';
+      if (p.fecha) {
+        const d = diasEntre(h, p.fecha);
+        cuandoTxt = d < 0 ? `<span class="cuando-prox pasada">fecha ya pasada</span>` : `<span class="cuando-prox">${d === 0 ? 'hoy' : 'en ' + plural(d, 'día')}</span>`;
+      }
+      return `<li><div class="fecha-prox">${p.fecha ? fechaMilitar(p.fecha) : 'Sin fecha'}${cuandoTxt}</div><div class="texto-prox">${esc(p.fecha ? p.resto || p.texto : p.texto)}<span class="etiqueta">${esc(p.tipo)}</span></div></li>`;
+    }).join('');
+    return `<div class="proximas-destacadas${f.proximas.length ? '' : ' vacia'}"><h3>➡️ PRÓXIMAS DILIGENCIAS</h3>${filas ? `<ul>${filas}</ul>` : '<p>⚠️ No hay próximas diligencias anotadas.</p>'}</div>`;
+  }
+
   // modo: 'ficha' (pantalla), 'expo' (lámina: últimas 4 diligencias) o 'foto' (para enviar: sin avisos)
   function contenidoFicha(f, modo) {
     const enExpo = modo === 'expo';
@@ -369,11 +383,11 @@
         ${dato('Prórrogas', f.prorrogas)}${dato('Vence la prórroga', venceTxt)}${dato('Lleva abierta', diasAbierta(f, h) != null ? duracion(diasAbierta(f, h)) + ' (' + plural(diasAbierta(f, h), 'día') + ')' : '')}
       </div>
       <div class="casillas">${casilla('CS DIVEDUC', f.csDiveduc)}${casilla('CSE', f.cse)}${casilla('Dictamen', f.dictamen)}</div>
+      ${proximasDestacadas(f, h)}
       ${tareas.length ? `<div class="plazos-ficha"><h3>📅 Plazos</h3>${tareas.map((t) => `<div class="tarea-linea ${t.estado}">${PLAZO[t.estado]} <b>${fechaMilitar(t.limite)}</b> <small>(${cuando(t.dias)})</small> — ${esc(t.que)} <small class="ayuda">· ${esc(t.regla)}</small></div>`).join('')}</div>` : ''}
       <div class="seccion-ficha">
         <h3>📝 Resumen del hecho</h3>${f.resumen.split('\n').map((p) => `<p>${esc(p)}</p>`).join('') || '<p class="ayuda">—</p>'}
         <h3>✅ Últimas diligencias${enExpo && f.ultimas.length > 4 ? ' (las 4 más recientes)' : ''}</h3>${tiempo(ultimas, 'ultimas')}
-        <h3>➡️ Próximas diligencias</h3>${tiempo(f.proximas, 'proximas')}
         ${f.notas ? `<h3>🗒 Notas</h3><p>${esc(f.notas)}</p>` : ''}
       </div>
       ${modo === 'ficha' && av.length ? `<div class="avisos-ficha"><b>⚠️ Para revisar</b><ul>${av.map((a) => `<li>${esc(a.texto)}</li>`).join('')}</ul></div>` : ''}`;
