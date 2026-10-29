@@ -18,16 +18,19 @@
       </div>
     </div>
     <div class="acciones">
-      <label class="boton principal">📂 Cargar PowerPoint
-        <input type="file" id="archivo" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
+      <label class="boton principal">📂 Cargar Excel
+        <input type="file" id="archivo" accept=".xlsx,.pptx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
       </label>
+      <button class="boton" id="exponer" hidden>📽 Exponer</button>
       <button class="boton" id="imprimir" hidden>🖨 Imprimir resumen</button>
+      <button class="boton" id="pasarExcel" hidden title="Arma el Excel con las ISA de este PowerPoint">📤 Pasar a Excel</button>
       <button class="boton" id="olvidar" hidden title="Borra los datos guardados en este computador">🗑 Olvidar datos</button>
     </div>
   </header>
 
   <nav class="pestanas" id="pestanas" hidden>
     <button data-vista="tablero" class="activa">📊 Tablero</button>
+    <button data-vista="agenda">📅 Agenda <span id="nAtrasos" class="globo"></span></button>
     <button data-vista="buscar">🔎 Buscar ISA</button>
     <button data-vista="fiscales">👤 Por fiscal</button>
     <button data-vista="judiciales" id="pestanaJudiciales">⚖️ Procesos judiciales</button>
@@ -40,9 +43,10 @@
     <section id="bienvenida" class="bienvenida">
       <div class="caja-carga" id="zonaCarga">
         <div class="icono-grande">📁</div>
-        <h2>Cargue el PowerPoint de la exposición de ISA</h2>
-        <p class="ahora">👉 <b>Ahora:</b> arrastre aquí el archivo del S-1 (por ejemplo <b>EXPO ISAs ESCINF 28OCT2026.pptx</b>) o use el botón <b>📂 Cargar PowerPoint</b>.</p>
-        <p>La app lee cada lámina (una por ISA) y arma el tablero, el buscador y los avisos. Cada semana se carga la presentación nueva.</p>
+        <h2>Cargue el Excel de las ISA</h2>
+        <p class="ahora">👉 <b>Ahora:</b> arrastre aquí el archivo <b>ISA ESCINF.xlsx</b> del S-1 o use el botón <b>📂 Cargar Excel</b>.</p>
+        <p>La app ordena las ISA, calcula los plazos (prórroga, CSE y gestiones) y arma la agenda de cada fiscal.</p>
+        <p class="nota">¿Todavía tiene solo el PowerPoint? También sirve: cárguelo y use <b>📤 Pasar a Excel</b> para armar el Excel lleno.</p>
         <label class="recordar"><input type="checkbox" id="recordar"> Recordar los datos en este computador (para no cargarlo cada vez)</label>
         <p class="nota">🔒 El archivo se lee en este computador. No se envía a ninguna parte. Tiene datos médicos y personales: si el computador es compartido, deje sin marcar «Recordar».</p>
       </div>
@@ -50,7 +54,7 @@
 
     <!-- Tablero -->
     <section id="vista-tablero" class="vista" hidden>
-      <p class="ahora">👉 <b>Ahora:</b> mire primero las <b>vencidas</b> y las que <b>vencen esta semana</b>. Toque una ISA para ver su ficha.</p>
+      <p class="ahora">👉 <b>Ahora:</b> mire primero las <b>vencidas</b> y los <b>plazos atrasados</b>. Toque una ISA para ver su ficha.</p>
       <div class="resumen" id="cifras"></div>
       <div class="dos-columnas">
         <div class="panel">
@@ -68,11 +72,31 @@
             <div id="barrasEstado"></div>
           </div>
           <div class="panel">
+            <h3>🏥 En qué va con la CSE</h3>
+            <div id="barrasCse"></div>
+          </div>
+          <div class="panel">
             <h3>🔁 Más prórrogas</h3>
             <div id="listaProrrogas" class="lista compacta"></div>
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- Agenda -->
+    <section id="vista-agenda" class="vista" hidden>
+      <p class="ahora">👉 <b>Ahora:</b> esto es lo que le toca a cada fiscal, del plazo más urgente al último. Imprima la agenda y entréguesela a cada uno.</p>
+      <div class="filtros">
+        <select id="agendaFiscal"><option value="">Fiscal: todos</option></select>
+        <select id="agendaEstado">
+          <option value="">Plazos: todos</option>
+          <option value="urgente" selected>🔴🟡 Atrasados y de esta semana</option>
+          <option value="atrasado">🔴 Solo atrasados</option>
+        </select>
+        <button class="boton" id="imprimirAgenda">🖨 Imprimir agenda por fiscal</button>
+      </div>
+      <p class="ayuda">Reglas: la prórroga dura hasta 20 días · a la CSE, cada 30 días hasta que lo citen · las demás gestiones (incluidas prórroga y pedir el informe a la CSE), cada 15 días.</p>
+      <div id="agenda"></div>
     </section>
 
     <!-- Buscar -->
@@ -89,10 +113,11 @@
           <option value="por_vencer">🟡 Vencen en 7 días</option>
           <option value="al_dia">🟢 Al día</option>
           <option value="cerrada">⚪ Cerradas</option>
+          <option value="atrasos">⏱ Con plazos atrasados</option>
         </select>
         <select id="orden">
           <option value="vence">Vence primero</option>
-          <option value="lamina">Orden de la presentación</option>
+          <option value="lamina">Por N.°</option>
           <option value="prorrogas">Más prórrogas primero</option>
           <option value="inicio">Más antiguas primero</option>
           <option value="nombre">Por nombre (A-Z)</option>
@@ -116,7 +141,7 @@
 
     <!-- Revisar -->
     <section id="vista-revisar" class="vista" hidden>
-      <p class="ahora">👉 <b>Ahora:</b> corrija esto en el PowerPoint antes de la exposición y vuelva a cargarlo.</p>
+      <p class="ahora" id="ahoraRevisar">👉 <b>Ahora:</b> corrija esto en el Excel y vuelva a cargarlo.</p>
       <div id="listaRevisar"></div>
     </section>
 
@@ -124,26 +149,32 @@
     <section id="vista-que-es" class="vista" hidden>
       <div class="panel texto">
         <h3>❔ ¿Qué muestra esta app?</h3>
-        <p>Lee el PowerPoint de la exposición de investigaciones sumarias (una lámina por ISA) y las ordena para consultarlas rápido. No cambia el PowerPoint: si algo está mal, se corrige en el PowerPoint y se vuelve a cargar.</p>
+        <p>Lee el Excel de las investigaciones sumarias (hoja «ISA», una fila por ISA; hoja «Diligencias», una fila por diligencia) y las ordena para consultarlas rápido. No cambia el Excel: si algo está mal, se corrige en el Excel y se vuelve a cargar.</p>
+        <h3>📅 Los plazos</h3>
+        <ul>
+          <li><b>Prórroga:</b> dura hasta 20 días. La app avisa si «Vence la prórroga» queda a más de 20 días de cuando se pidió, y recuerda pedir la siguiente antes de que venza.</li>
+          <li><b>CSE:</b> mientras no lo citen, se pide o reitera cada 30 días. Si la citación ya pasó y no hay asistencia anotada, hay que pedir hora de nuevo.</li>
+          <li><b>Las demás gestiones</b> (también pedir prórroga y pedir el informe a la CSE): cada 15 días desde la última.</li>
+        </ul>
         <h3>🚦 Los colores</h3>
         <ul>
-          <li>🔴 <b>Vencida:</b> la fecha de vencimiento («Fecha Ven») ya pasó.</li>
-          <li>🟡 <b>Vence en 7 días</b> o menos.</li>
-          <li>🟢 <b>Al día:</b> vence en más de 7 días.</li>
+          <li>🔴 <b>Vencida</b> o <b>atrasado:</b> la fecha ya pasó.</li>
+          <li>🟡 <b>Esta semana:</b> 7 días o menos.</li>
+          <li>🟢 <b>Al día:</b> más de 7 días.</li>
           <li>⚪ <b>Cerrada.</b></li>
         </ul>
         <h3>📖 Palabras</h3>
         <dl class="glosario">
           <dt>ISA</dt><dd>Investigación sumaria administrativa.</dd>
           <dt>Fiscal y secretario</dt><dd>Quienes llevan la investigación.</dd>
-          <dt>Prórroga</dt><dd>Más plazo para la investigación. La lámina dice cuántas lleva y hasta cuándo vence la actual.</dd>
+          <dt>Prórroga</dt><dd>Más plazo para la investigación (hasta 20 días cada una).</dd>
           <dt>CSE</dt><dd>Comisión de Sanidad del Ejército.</dd>
           <dt>CSD</dt><dd>Comisión de Sanidad Divisionaria.</dd>
           <dt>Dictamen</dt><dd>Conclusión del fiscal al terminar la investigación.</dd>
         </dl>
-        <h3>⚠️ «Revisar planilla»</h3>
-        <p>Avisa de lo que conviene corregir: ISA vencidas, próximas diligencias con fecha ya pasada, ISA abiertas sin próximas diligencias y fechas escritas de otra forma (lo normal es DDMMMAAAA, por ejemplo 14DIC2024).</p>
-        <p class="nota">Para que la app lea bien una lámina nueva, cópiela de una existente y cambie solo el texto de las casillas.</p>
+        <h3>📽 Exponer</h3>
+        <p>Muestra una ISA por pantalla, como láminas. Avance con las flechas ← → o la barra espaciadora; salga con Esc.</p>
+        <p class="nota">La hoja «Instrucciones» del Excel explica cómo llenarlo y qué significa cada tipo de diligencia.</p>
       </div>
     </section>
 
@@ -157,7 +188,21 @@
     <form method="dialog"><button class="boton principal">Cerrar</button></form>
   </dialog>
 
+  <!-- Modo exposición -->
+  <div id="expo" class="expo" hidden>
+    <div id="expoLamina" class="expo-lamina"></div>
+    <div class="expo-controles">
+      <button class="boton" id="expoAtras">◀</button>
+      <span id="expoNumero"></span>
+      <button class="boton" id="expoAdelante">▶</button>
+      <button class="boton" id="expoSalir">✕ Salir</button>
+    </div>
+  </div>
+
+  <script src="lib/xlsx.full.min.js"></script>
   <script src="leer_ppt.js"></script>
+  <script src="plazos.js"></script>
+  <script src="excel.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

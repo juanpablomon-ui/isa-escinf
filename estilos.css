@@ -244,6 +244,41 @@ dialog form { text-align: right; margin-top: 12px; }
 .avisos-ficha { margin: 10px 0 0; padding: 8px 12px; border-radius: 8px; background: var(--amarillo-claro); font-size: 14px; }
 .avisos-ficha ul { margin: 4px 0 0; padding-left: 20px; }
 
+/* Agenda */
+.tareas { display: flex; flex-direction: column; gap: 6px; }
+.tarea {
+  display: grid; grid-template-columns: 150px 1fr; gap: 10px; align-items: start;
+  background: var(--fondo); border: 1px solid var(--linea); border-left: 6px solid var(--verde); border-radius: 8px;
+  padding: 7px 10px; text-align: left; font: inherit; color: inherit; cursor: pointer; width: 100%;
+}
+.tarea:hover { border-color: var(--acento); }
+.tarea.atrasado { border-left-color: var(--rojo); }
+.tarea.semana { border-left-color: var(--amarillo); }
+.tarea .cuando small { display: block; color: var(--suave); font-size: 12px; }
+.tarea .que { display: flex; flex-direction: column; gap: 1px; font-size: 14px; }
+.plazos-ficha { background: var(--fondo); border-radius: 10px; padding: 8px 12px; margin: 6px 0 4px; }
+.plazos-ficha h3 { margin: 0 0 4px; font-size: 15px; color: var(--acento); }
+.tarea-linea { font-size: 14px; padding: 2px 0; }
+.tarea-linea.atrasado b { color: var(--rojo); }
+.tiempo .etiqueta { margin-right: 4px; }
+
+/* Exponer */
+.expo { position: fixed; inset: 0; z-index: 50; background: var(--papel); display: flex; flex-direction: column; }
+.expo-lamina { flex: 1; overflow-y: auto; padding: 28px max(24px, 6vw); font-size: 19px; }
+.expo-lamina h2 { font-size: 34px; margin: 6px 0; }
+.expo-lamina .dato b { font-size: 19px; }
+.expo-lamina .dato small { font-size: 13px; }
+.expo-lamina .seccion-ficha h3, .expo-lamina .plazos-ficha h3 { font-size: 19px; }
+.expo-lamina .tiempo li, .expo-lamina .tarea-linea, .expo-lamina .casilla { font-size: 17px; }
+.expo-lamina table td, .expo-lamina table th { font-size: 16px; }
+.expo-controles { display: flex; gap: 10px; align-items: center; justify-content: center; padding: 10px; border-top: 1px solid var(--linea); background: var(--fondo); }
+.portada { text-align: center; padding-top: 8vh; }
+.portada h1 { font-size: 48px; color: var(--acento); margin: 0; }
+.fecha-portada { font-size: 28px; color: var(--suave); }
+.portada .resumen { max-width: 900px; margin: 40px auto 0; }
+.portada .cifra { cursor: default; text-align: center; }
+.portada .cifra b { font-size: 44px; }
+
 .impresion { display: none; }
 
 @media (max-width: 760px) {
@@ -273,4 +308,8 @@ dialog form { text-align: right; margin-top: 12px; }
   .impresion th, .impresion td { font-size: 10px; padding: 4px 5px; border: 1px solid #999; color: #000; }
   .impresion th { background: #e4eaf3 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .impresion tr { break-inside: avoid; }
+  .impresion h2 { font-size: 13px; margin: 12px 0 4px; }
+  .impresion .pagina { break-after: page; }
+  .impresion .pagina:last-child { break-after: auto; }
+  .expo { display: none !important; }
 }
