@@ -471,4 +471,7 @@
     guardado.fichas.forEach((f) => Plazos.completar(f, +(guardado.fechaExpo || hoy()).slice(0, 4)));
     mostrarDatos(guardado);
   }
+
+  // Instalable y sin internet (solo publicada; abierta con doble clic no hace falta)
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

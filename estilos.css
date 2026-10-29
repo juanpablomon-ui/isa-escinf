@@ -293,6 +293,16 @@ dialog form { text-align: right; margin-top: 12px; }
   .cifra b { font-size: 24px; }
   .filtros select { flex: 1 1 45%; }
   .barra-dato { grid-template-columns: 100px 1fr 30px; }
+  /* Teléfono: la agenda en una columna y la barra de arriba más chica */
+  .tarea { grid-template-columns: 1fr; gap: 2px; }
+  .tarea .cuando small { display: inline; margin-left: 6px; }
+  .acciones .boton { padding: 7px 10px; font-size: 14px; }
+  #imprimir, #imprimirAgenda { display: none; }
+  .escudo { font-size: 26px; }
+  .barra h1 { font-size: 19px; }
+  .expo-lamina { padding: 16px; font-size: 16px; }
+  .expo-lamina h2 { font-size: 24px; }
+  .portada h1 { font-size: 30px; }
 }
 
 /* Imprimir: solo el resumen armado para la reunión */
