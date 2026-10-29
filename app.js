@@ -319,13 +319,15 @@
         <div class="cifra"><b>${masAntigua.length ? duracion(diasAbierta(masAntigua[0], h)) : '—'}</b><span>la más antigua</span></div>
         <div class="cifra"><b>${prom(abiertas, (f) => f.prorrogas) ?? '—'}</b><span>prórrogas en promedio</span></div>
       </div>
-      <div class="dos-columnas">
-        <div class="panel"><h3>⏳ Cuánto tiempo llevan abiertas</h3>
-          ${tramos.map(([t, n]) => `<div class="barra-dato"><span>${t}</span><div class="fondo-barra"><div class="relleno" style="width:${(100 * n) / max}%"></div></div><span class="num">${n}</span></div>`).join('')}
-        </div>
-        <div class="panel"><h3>🐢 Las que llevan más tiempo abiertas</h3>
-          <div class="lista compacta">${masAntigua.slice(0, 5).map((f) => `<button class="item ${semaforo(f, h)}" data-id="${f.id}"><span class="nombre">${esc(f.titulo)}</span><span class="derecha"><b>${duracion(diasAbierta(f, h))}</b><small>desde ${fechaMilitar(f.inicio)}</small></span><span class="linea">${esc(f.tipoGrupo)} · ${plural(f.prorrogas || 0, 'prórroga')} · ${esc(f.fiscal)}</span></button>`).join('')}</div>
-        </div>
+      <div class="panel"><h3>⏳ Cuánto tiempo llevan abiertas</h3>
+        ${tramos.map(([t, n]) => `<div class="barra-dato"><span>${t}</span><div class="fondo-barra"><div class="relleno" style="width:${(100 * n) / max}%"></div></div><span class="num">${n}</span></div>`).join('')}
+      </div>
+      <div class="panel"><h3>🏆 Ranking de tiempo abierta</h3>
+        <p class="ayuda">De la que lleva más tiempo abierta a la más nueva. Toque una para ver su ficha.</p>
+        <div class="tabla-scroll"><table class="ranking"><thead><tr><th>N.°</th><th>Afectado / ISA</th><th>Abierta</th><th>Desde</th><th>Tipo</th><th>Prórrogas</th><th>Fiscal</th><th>Vence</th></tr></thead><tbody>
+        ${masAntigua.map((f, i) => { const sm = semaforo(f, h); return `<tr data-id="${f.id}"><td class="puesto">${i + 1}</td><td><b>${esc(f.titulo)}</b></td><td><b>${duracion(diasAbierta(f, h))}</b><br><small class="ayuda">${plural(diasAbierta(f, h), 'día')}</small></td><td>${fechaMilitar(f.inicio)}</td><td>${esc(f.tipoGrupo)}</td><td>${f.prorrogas ?? '—'}</td><td>${esc(f.fiscal)}</td><td>${SEMAFORO[sm].punto} ${f.vence ? fechaMilitar(f.vence) : ''}</td></tr>`; }).join('')}
+        </tbody></table></div>
+        ${abiertas.length > conDias.length ? `<p class="ayuda">${plural(abiertas.length - conDias.length, 'ISA abierta')} sin fecha de inicio no entra${abiertas.length - conDias.length === 1 ? '' : 'n'} al ranking.</p>` : ''}
       </div>
       ${tabla('📂 Por tipo de ISA', (f) => f.tipoGrupo)}
       ${tabla('🏥 Por etapa en la CSE', (f) => Plazos.etapaCse(f, h).etapa || 'Sin trámite en la CSE')}
