@@ -147,9 +147,35 @@
     </button>`;
   }
 
-  function barras(destino, pares) {
+  // grupo: qué se filtra al tocar la barra (tipo, estado, cse, tramo, fiscal, unidad)
+  const barraHtml = (t, n, max, grupo, soloAbiertas) => `<button class="barra-dato" data-grupo="${grupo}" data-valor="${esc(t)}"${soloAbiertas ? ' data-abiertas="1"' : ''} title="Ver cuáles son"><span>${esc(t)}</span><div class="fondo-barra"><div class="relleno" style="width:${(100 * n) / max}%"></div></div><span class="num">${n}</span></button>`;
+  function barras(destino, pares, grupo, soloAbiertas) {
     const max = Math.max(1, ...pares.map((p) => p[1]));
-    $(destino).innerHTML = pares.map(([t, n]) => `<div class="barra-dato"><span>${esc(t)}</span><div class="fondo-barra"><div class="relleno" style="width:${(100 * n) / max}%"></div></div><span class="num">${n}</span></div>`).join('') || '<p class="ayuda">—</p>';
+    $(destino).innerHTML = pares.map(([t, n]) => barraHtml(t, n, max, grupo, soloAbiertas)).join('') || '<p class="ayuda">—</p>';
+  }
+
+  // Ir a «Buscar» mostrando solo las ISA de un grupo (al tocar una barra o una fila de la estadística)
+  const TRAMOS = [['Menos de 3 meses', 0, 91], ['3 a 6 meses', 91, 183], ['6 meses a 1 año', 183, 366], ['Más de 1 año', 366, 1e9]];
+  const etapaDe = (f, h) => Plazos.etapaCse(f, h).etapa || 'Sin trámite en la CSE';
+  function verGrupo(grupo, valor, soloAbiertas) {
+    const h = hoy(), tramo = TRAMOS.find((x) => x[0] === valor);
+    const prueba = {
+      tipo: (f) => f.tipoGrupo === valor,
+      estado: (f) => f.estadoGrupo === valor,
+      cse: (f) => etapaDe(f, h) === valor,
+      fiscal: (f) => (f.fiscal || '—') === valor,
+      unidad: (f) => (f.unidad || '—') === valor,
+      tramo: (f) => tramo && diasAbierta(f, h) != null && diasAbierta(f, h) >= tramo[1] && diasAbierta(f, h) < tramo[2]
+    }[grupo];
+    if (!prueba) return;
+    const nombre = { tipo: 'Tipo', estado: 'Estado', cse: 'CSE', fiscal: 'Fiscal', unidad: 'Unidad', tramo: 'Abierta' }[grupo];
+    estado.extra = {
+      etiqueta: `${nombre}: ${valor}${soloAbiertas || grupo === 'cse' || grupo === 'tramo' ? ' (solo abiertas)' : ''}`,
+      prueba: soloAbiertas || grupo === 'cse' ? (f) => f.estadoGrupo !== 'Cerrada' && prueba(f) : prueba
+    };
+    ['busqueda', 'filtroEstado', 'filtroTipo', 'filtroFiscal', 'filtroSemaforo'].forEach((id) => { $(id).value = ''; });
+    $('orden').value = grupo === 'tramo' ? 'inicio' : 'vence';
+    cambiarVista('buscar');
   }
   const contar = (lista, fn) => {
     const c = {};
@@ -174,9 +200,9 @@
     $('cifras').innerHTML = cifras.map(([filtro, n, t, c]) => `<button class="cifra ${c}" data-filtro="${filtro}"><b>${n}</b><span>${t}</span></button>`).join('');
     $('hoyTexto').textContent = `Al día de hoy, ${fechaMilitar(h)}. Las ISA abiertas, de la que vence primero a la última.`;
     $('listaVencimientos').innerHTML = abiertas.slice().sort(ordenVence).map((f) => tarjeta(f)).join('') || '<p class="ayuda">No hay ISA abiertas.</p>';
-    barras('barrasTipo', contar(fs, (f) => f.tipoGrupo));
-    barras('barrasEstado', contar(fs, (f) => f.estadoGrupo));
-    barras('barrasCse', contar(abiertas, (f) => Plazos.etapaCse(f, h).etapa || 'Sin trámite en la CSE'));
+    barras('barrasTipo', contar(fs, (f) => f.tipoGrupo), 'tipo');
+    barras('barrasEstado', contar(fs, (f) => f.estadoGrupo), 'estado');
+    barras('barrasCse', contar(abiertas, (f) => etapaDe(f, h)), 'cse', true);
     $('listaProrrogas').innerHTML = abiertas.filter((f) => f.prorrogas != null)
       .sort((a, b) => b.prorrogas - a.prorrogas).slice(0, 5)
       .map((f) => `<button class="item ${semaforo(f, h)}" data-id="${f.id}"><span class="nombre">${esc(f.titulo)}</span><span class="derecha"><b>${f.prorrogas}</b><small>prórrogas</small></span><span class="linea">Desde ${f.inicio ? fechaMilitar(f.inicio) : esc(f.inicioTexto)} · ${esc(f.fiscal)}</span></button>`).join('');
@@ -218,7 +244,10 @@
     const fs = estado.datos.fichas, h = hoy();
     const palabras = normal($('busqueda').value).split(/\s+/).filter(Boolean);
     const fe = $('filtroEstado').value, ft = $('filtroTipo').value, ff = $('filtroFiscal').value, fsem = $('filtroSemaforo').value;
+    const extra = estado.extra;
+    $('filtroExtra').innerHTML = extra ? `<span class="chip-extra">Mostrando: <b>${esc(extra.etiqueta)}</b> <button id="quitarExtra" title="Quitar este filtro">✕ Ver todas</button></span>` : '';
     let lista = fs.filter((f) => {
+      if (extra && !extra.prueba(f)) return false;
       if (fe && f.estadoGrupo !== fe) return false;
       if (ft && f.tipoGrupo !== ft) return false;
       if (ff && f.fiscalClave !== ff) return false;
@@ -300,16 +329,16 @@
     const prom = (lista, fn) => { const v = lista.map(fn).filter((x) => x != null); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
     const promDias = prom(conDias, (f) => diasAbierta(f, h));
     const masAntigua = conDias.slice().sort((a, b) => diasAbierta(b, h) - diasAbierta(a, h));
-    const tramos = [['Menos de 3 meses', 0, 91], ['3 a 6 meses', 91, 183], ['6 meses a 1 año', 183, 366], ['Más de 1 año', 366, 1e9]]
+    const tramos = TRAMOS
       .map(([t, a, b]) => [t, conDias.filter((f) => diasAbierta(f, h) >= a && diasAbierta(f, h) < b).length]);
     const max = Math.max(1, ...tramos.map((x) => x[1]));
-    const tabla = (titulo, clave) => {
+    const tabla = (titulo, clave, grupo) => {
       const g = {};
       for (const f of abiertas) { const k = clave(f) || '—'; (g[k] = g[k] || []).push(f); }
       const filas = Object.entries(g).sort((a, b) => b[1].length - a[1].length || (prom(b[1], (f) => diasAbierta(f, h)) || 0) - (prom(a[1], (f) => diasAbierta(f, h)) || 0));
       return `<div class="panel"><h3>${titulo}</h3><div class="tabla-scroll"><table><thead><tr><th></th><th>ISA abiertas</th><th>Abierta (promedio)</th><th>Prórrogas (promedio)</th><th>Vencidas</th><th>Con plazos atrasados</th></tr></thead><tbody>${filas.map(([k, l]) => {
         const v = l.filter((f) => semaforo(f, h) === 'vencida').length, a = l.filter((f) => atrasos(f, h).length).length;
-        return `<tr><td><b>${esc(k)}</b></td><td>${l.length}</td><td>${duracion(prom(l, (f) => diasAbierta(f, h)))}</td><td>${prom(l, (f) => f.prorrogas) ?? '—'}</td><td>${v ? `<span class="txt-rojo">${v}</span>` : 0}</td><td>${a ? `<span class="txt-rojo">${a}</span>` : 0}</td></tr>`;
+        return `<tr data-grupo="${grupo}" data-valor="${esc(k)}" data-abiertas="1" title="Ver cuáles son"><td><b>${esc(k)}</b> <span class="ayuda">›</span></td><td>${l.length}</td><td>${duracion(prom(l, (f) => diasAbierta(f, h)))}</td><td>${prom(l, (f) => f.prorrogas) ?? '—'}</td><td>${v ? `<span class="txt-rojo">${v}</span>` : 0}</td><td>${a ? `<span class="txt-rojo">${a}</span>` : 0}</td></tr>`;
       }).join('')}</tbody></table></div></div>`;
     };
     return `
@@ -320,7 +349,7 @@
         <div class="cifra"><b>${prom(abiertas, (f) => f.prorrogas) ?? '—'}</b><span>prórrogas en promedio</span></div>
       </div>
       <div class="panel"><h3>⏳ Cuánto tiempo llevan abiertas</h3>
-        ${tramos.map(([t, n]) => `<div class="barra-dato"><span>${t}</span><div class="fondo-barra"><div class="relleno" style="width:${(100 * n) / max}%"></div></div><span class="num">${n}</span></div>`).join('')}
+        ${tramos.map(([t, n]) => barraHtml(t, n, max, 'tramo', true)).join('')}
       </div>
       <div class="panel"><h3>🏆 Ranking de tiempo abierta</h3>
         <p class="ayuda">De la que lleva más tiempo abierta a la más nueva. Toque una para ver su ficha.</p>
@@ -329,10 +358,11 @@
         </tbody></table></div>
         ${abiertas.length > conDias.length ? `<p class="ayuda">${plural(abiertas.length - conDias.length, 'ISA abierta')} sin fecha de inicio no entra${abiertas.length - conDias.length === 1 ? '' : 'n'} al ranking.</p>` : ''}
       </div>
-      ${tabla('📂 Por tipo de ISA', (f) => f.tipoGrupo)}
-      ${tabla('🏥 Por etapa en la CSE', (f) => Plazos.etapaCse(f, h).etapa || 'Sin trámite en la CSE')}
-      ${tabla('👤 Por fiscal', (f) => f.fiscal)}
-      ${tabla('🏢 Por unidad', (f) => f.unidad)}`;
+      <p class="ayuda">👉 Toque una barra o una fila de las tablas para ver cuáles son.</p>
+      ${tabla('📂 Por tipo de ISA', (f) => f.tipoGrupo, 'tipo')}
+      ${tabla('🏥 Por etapa en la CSE', (f) => etapaDe(f, h), 'cse')}
+      ${tabla('👤 Por fiscal', (f) => f.fiscal, 'fiscal')}
+      ${tabla('🏢 Por unidad', (f) => f.unidad, 'unidad')}`;
   }
   function verEstadistica() { $('estadistica').innerHTML = estadisticaHtml(); }
   function imprimirEstadistica() {
@@ -558,8 +588,12 @@
     if (!$('expo').hidden) return;
     const isa = e.target.closest('[data-id]');
     if (isa) { abrirFicha(isa.dataset.id); return; }
+    if (e.target.closest('#quitarExtra')) { estado.extra = null; verLista(); return; }
+    const grupo = e.target.closest('[data-grupo]');
+    if (grupo) { verGrupo(grupo.dataset.grupo, grupo.dataset.valor, !!grupo.dataset.abiertas); return; }
     const cifra = e.target.closest('.cifra');
     if (cifra && cifra.dataset.filtro != null) {
+      estado.extra = null;
       $('busqueda').value = ''; $('filtroEstado').value = ''; $('filtroTipo').value = ''; $('filtroFiscal').value = '';
       $('filtroSemaforo').value = cifra.dataset.filtro;
       cambiarVista('buscar');
@@ -567,6 +601,7 @@
     }
     const fiscal = e.target.closest('[data-fiscal]');
     if (fiscal) {
+      estado.extra = null;
       $('busqueda').value = ''; $('filtroEstado').value = ''; $('filtroTipo').value = ''; $('filtroSemaforo').value = '';
       $('filtroFiscal').value = fiscal.dataset.fiscal;
       cambiarVista('buscar');

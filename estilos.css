@@ -281,6 +281,15 @@ dialog form { text-align: right; margin-top: 12px; }
 
 .impresion { display: none; }
 
+/* Barras y filas que se pueden tocar (llevan a la lista de esas ISA) */
+button.barra-dato { width: 100%; border: none; background: none; padding: 3px 4px; margin: 2px 0; font: inherit; color: inherit; text-align: left; cursor: pointer; border-radius: 6px; font-size: 14px; }
+button.barra-dato:hover { background: var(--azul-claro); }
+button.barra-dato:hover .relleno { filter: brightness(1.2); }
+tr[data-grupo] { cursor: pointer; }
+tr[data-grupo]:hover td { background: var(--azul-claro); }
+.chip-extra { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--azul-claro); border: 1px solid var(--acento); border-radius: 20px; padding: 5px 6px 5px 12px; margin: 4px 0; font-size: 14px; }
+.chip-extra button { border: none; background: var(--acento); color: #fff; border-radius: 14px; padding: 4px 10px; cursor: pointer; font: inherit; font-size: 13px; }
+
 /* Ranking de tiempo abierta */
 .ranking tbody tr { cursor: pointer; }
 .ranking tbody tr:hover td { background: var(--azul-claro); }
