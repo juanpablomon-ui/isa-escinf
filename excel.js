@@ -17,29 +17,29 @@
   };
   // Columnas (el título es lo que se busca al leer; el orden puede cambiar en el Excel)
   const COL_ISA = [
-    { k: 'n', t: 'N.°', ancho: 6, tipo: 'numero' },
-    { k: 'titulo', t: 'Afectado / ISA', ancho: 34 },
+    { k: 'n', t: 'N.°', ancho: 6, tipo: 'numero', alias: ['N°', 'Nro', 'Número', 'N'] },
+    { k: 'titulo', t: 'Afectado / ISA', ancho: 34, alias: ['Afectado', 'ISA', 'Nombre', 'Grado y nombre', 'Afectado o ISA'] },
     { k: 'unidad', t: 'Unidad', ancho: 20 },
-    { k: 'tipo', t: 'Tipo de ISA', ancho: 18, lista: LISTAS.tipo },
-    { k: 'inicio', t: 'Fecha de inicio', ancho: 13, tipo: 'fecha' },
-    { k: 'estado', t: 'Estado', ancho: 17, lista: LISTAS.estado },
+    { k: 'tipo', t: 'Tipo de ISA', ancho: 18, lista: LISTAS.tipo, alias: ['Tipo'] },
+    { k: 'inicio', t: 'Fecha de inicio', ancho: 13, tipo: 'fecha', alias: ['Inicio', 'Fecha inicio'] },
+    { k: 'estado', t: 'Estado', ancho: 17, lista: LISTAS.estado, alias: ['Estado de la ISA'] },
     { k: 'csDiveduc', t: 'CS DIVEDUC', ancho: 11, lista: LISTAS.siNo },
     { k: 'cse', t: 'CSE', ancho: 8, lista: LISTAS.siNo },
     { k: 'dictamen', t: 'Dictamen', ancho: 10, lista: LISTAS.siNo },
     { k: 'fiscal', t: 'Fiscal', ancho: 22 },
     { k: 'secretario', t: 'Secretario', ancho: 20 },
-    { k: 'prorrogas', t: 'N.° prórrogas', ancho: 11, tipo: 'numero' },
-    { k: 'vence', t: 'Vence la prórroga', ancho: 13, tipo: 'fecha' },
-    { k: 'resumen', t: 'Resumen del hecho', ancho: 70 },
-    { k: 'notas', t: 'Notas', ancho: 40 }
+    { k: 'prorrogas', t: 'N.° prórrogas', ancho: 11, tipo: 'numero', alias: ['Prórrogas', 'N° de prórrogas', 'Cantidad de prórrogas'] },
+    { k: 'vence', t: 'Vence la prórroga', ancho: 13, tipo: 'fecha', alias: ['Fecha Ven', 'Fecha de vencimiento', 'Vence', 'Vencimiento', 'Fecha venc'] },
+    { k: 'resumen', t: 'Resumen del hecho', ancho: 70, alias: ['Resumen', 'Hecho'] },
+    { k: 'notas', t: 'Notas', ancho: 40, alias: ['Observaciones', 'Nota'] }
   ];
   const COL_DIL = [
-    { k: 'n', t: 'N.° ISA', ancho: 8, tipo: 'numero' },
-    { k: 'afectado', t: 'Afectado (se llena solo)', ancho: 30, auto: true },
+    { k: 'n', t: 'N.° ISA', ancho: 8, tipo: 'numero', alias: ['N° ISA', 'ISA', 'N.°'] },
+    { k: 'afectado', t: 'Afectado (se llena solo)', ancho: 30, auto: true, alias: ['Afectado'] },
     { k: 'fecha', t: 'Fecha', ancho: 13, tipo: 'fecha' },
-    { k: 'tipo', t: 'Tipo', ancho: 20, lista: P.TIPOS },
-    { k: 'hecha', t: '¿Hecha o pendiente?', ancho: 12, lista: LISTAS.hecha },
-    { k: 'detalle', t: 'Detalle', ancho: 80 },
+    { k: 'tipo', t: 'Tipo', ancho: 20, lista: P.TIPOS, alias: ['Tipo de diligencia'] },
+    { k: 'hecha', t: '¿Hecha o pendiente?', ancho: 12, lista: LISTAS.hecha, alias: ['Estado', 'Hecha', 'Hecha o pendiente', 'Situación'] },
+    { k: 'detalle', t: 'Detalle', ancho: 80, alias: ['Diligencia', 'Descripción'] },
     { k: 'revisar', t: 'Revisar', ancho: 32 }
   ];
   const FILAS_DIL = 600; // filas con la fórmula del afectado ya puesta
@@ -270,10 +270,16 @@
     const titulos = filas[0].map(claveTitulo);
     const pos = {};
     for (const c of columnas) {
-      const i = titulos.indexOf(claveTitulo(c.t));
-      if (i >= 0) pos[c.k] = i;
+      // el título de la app, o alguno de los otros nombres con que se suele escribir
+      for (const t of [c.t, ...(c.alias || [])]) {
+        const i = titulos.indexOf(claveTitulo(t));
+        if (i >= 0 && !Object.values(pos).includes(i)) { pos[c.k] = i; break; }
+      }
     }
-    return filas.slice(1).map((f) => { const o = {}; for (const k in pos) o[k] = f[pos[k]]; return o; });
+    const datos = filas.slice(1).map((f) => { const o = {}; for (const k in pos) o[k] = f[pos[k]]; return o; });
+    datos.encontradas = Object.keys(pos);
+    datos.titulos = filas[0].filter((t) => String(t).trim());
+    return datos;
   }
   const texto = (v) => (v == null ? '' : String(v).trim());
 
@@ -283,7 +289,11 @@
     const hoy = new Date().toISOString().slice(0, 10);
     const anioRef = +hoy.slice(0, 4);
     const fichas = [], porN = {};
-    for (const r of conTitulos(filasIsa, COL_ISA)) {
+    const isa = conTitulos(filasIsa, COL_ISA);
+    // Si faltan las columnas que sí o sí se necesitan, decir cuáles, en vez de mostrar la app vacía
+    const faltan = COL_ISA.filter((c) => ['n', 'titulo'].includes(c.k) && !isa.encontradas.includes(c.k)).map((c) => `«${c.t}»`);
+    if (faltan.length) throw new Error(`En la hoja «ISA» no encontré la columna ${faltan.join(' ni la columna ')}.\n\nTítulos que tiene la hoja: ${isa.titulos.join(' · ') || '(ninguno en la fila 1)'}.\n\nLos títulos deben estar en la fila 1.`);
+    for (const r of isa) {
       const n = Number(r.n);
       if (!n || !texto(r.titulo)) continue;
       const f = {
